@@ -1,2 +1,7 @@
-.omc/
+node_modules/
+.env
 .DS_Store
+*.log
+policy.json
+cloudfront-config.json
+.omc/
