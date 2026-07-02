@@ -50,52 +50,63 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Button interactions
-document.querySelector('.btn-primary').addEventListener('click', function() {
-    document.querySelector('#about').scrollIntoView({ behavior: 'smooth' });
-});
+// Waitlist signup — posts to an AWS Lambda (via API Gateway) that appends each
+// signup to waitlist.csv / waitlist.json in a private S3 bucket. No manual setup.
+const WAITLIST_ENDPOINT = 'https://wgmcc22seg.execute-api.us-east-1.amazonaws.com/';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-document.querySelector('.btn-secondary').addEventListener('click', function() {
-    document.querySelector('#contact').scrollIntoView({ behavior: 'smooth' });
-});
-
-// Contact form
-document.querySelector('.contact form').addEventListener('submit', function(e) {
+const waitlistForm = document.querySelector('#waitlist-form');
+waitlistForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const email = this.querySelector('input[type="email"]').value;
-    
-    if (email) {
-        // Simple notification
-        const notification = document.createElement('div');
-        notification.textContent = 'Message sent! We\'ll contact you soon.';
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #1e40af;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 5px;
-            z-index: 1000;
-            animation: slideIn 0.3s ease;
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-        
-        this.reset();
+
+    const emailInput = document.querySelector('#waitlist-email');
+    const submitBtn = document.querySelector('#waitlist-submit');
+    const messageEl = document.querySelector('#waitlist-message');
+    const email = emailInput?.value.trim() ?? '';
+    const phone = document.querySelector('#waitlist-phone')?.value.trim() ?? '';
+    const linkedin = document.querySelector('#waitlist-linkedin')?.value.trim() ?? '';
+
+    const setMessage = (text, kind) => {
+        if (!messageEl) return;
+        messageEl.textContent = text;
+        messageEl.className = `waitlist-message ${kind}`;
+    };
+
+    if (!EMAIL_RE.test(email)) {
+        setMessage('Please enter a valid email address.', 'error');
+        emailInput?.focus();
+        return;
+    }
+
+    const originalLabel = submitBtn?.textContent ?? 'Join the waitlist';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Joining…';
+    }
+    setMessage('', '');
+
+    try {
+        const res = await fetch(WAITLIST_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, phone, linkedin, source: 'waitlist-ibu-ai' }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.ok) {
+            setMessage(data.message || "You're on the list!", 'success');
+            waitlistForm.reset();
+        } else if (data.error === 'invalid_email') {
+            setMessage('Please enter a valid email address.', 'error');
+        } else {
+            setMessage('Something went wrong. Please try again.', 'error');
+        }
+    } catch {
+        setMessage('Network error. Please check your connection and try again.', 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalLabel;
+        }
     }
 });
-
-// Add slide-in animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-`;
-document.head.appendChild(style);

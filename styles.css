@@ -242,6 +242,161 @@ input::placeholder {
     color: var(--text-tertiary);
 }
 
+/* Waitlist page hero — compact so the form + info fit on mobile */
+.waitlist-hero {
+    min-height: auto;
+    padding: 24px 0 8px;
+}
+
+.hero-logo-small {
+    width: clamp(72px, 16vw, 110px);
+    margin-bottom: 14px;
+}
+
+.hero-title-sm {
+    font-size: clamp(1.9rem, 6vw, 3rem);
+    margin-bottom: 10px;
+}
+
+.hero-title-sm .by {
+    -webkit-text-fill-color: initial;
+    background: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.5em;
+}
+
+/* Waitlist form — stacked, thin inputs, mobile-first */
+.waitlist-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 340px;
+    margin: 8px auto 0;
+    text-align: left;
+    animation: fadeInUp 0.8s ease-out 0.4s both;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field-label {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding-left: 2px;
+}
+
+.field-label .req { color: #f87171; font-weight: 700; }
+.field-label .opt { color: var(--text-tertiary); font-weight: 400; }
+
+.waitlist-form input {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 0.95rem;
+    border-radius: 10px;
+}
+
+.waitlist-form .btn-primary {
+    margin-top: 4px;
+    padding: 13px 24px;
+    width: 100%;
+}
+
+.waitlist-message {
+    margin-top: 16px;
+    min-height: 1.4em;
+    text-align: center;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+}
+
+.waitlist-message.success { color: #34d399; }
+.waitlist-message.error { color: #f87171; }
+
+/* Link styled as a button (main-site CTA) */
+.btn-link {
+    display: inline-block;
+    text-decoration: none;
+    text-align: center;
+    padding: 16px 40px;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+/* Yoodolon info section */
+.yoodolon-info {
+    max-width: 640px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.yoodolon-tagline {
+    text-align: center;
+    font-style: italic;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 40px;
+    font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+}
+
+.yoodolon-info h2 {
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.yoodolon-info .spark {
+    -webkit-text-fill-color: initial;
+    background: none;
+    font-size: 1.6rem;
+}
+
+.yoodolon-info p {
+    text-align: left;
+    margin: 0 0 16px;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+}
+
+.yoodolon-card {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 24px 0;
+}
+
+.yoodolon-card-title {
+    display: block;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+
+.yoodolon-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-tertiary);
+}
+
+.quest-note {
+    font-size: 0.9rem !important;
+    color: var(--text-tertiary) !important;
+    text-align: center !important;
+}
+
 /* Footer */
 footer {
     text-align: center;
