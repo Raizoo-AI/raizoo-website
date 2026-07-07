@@ -34,22 +34,22 @@
                 <h1 class="hero-title hero-title-sm">Yoodolon&trade; <span class="by">by IBU</span></h1>
                 <p class="slogan">Your personal AI companion. Join the waitlist.</p>
 
+                <p class="incentive-badge">First 1,000 members get a free month after trial, plus 30% off their first year.</p>
+
                 <form id="waitlist-form" class="waitlist-form" novalidate>
                     <label class="field">
                         <span class="field-label">Email <span class="req">*</span></span>
                         <input type="email" id="waitlist-email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
                     </label>
-                    <label class="field">
-                        <span class="field-label">Phone <span class="opt">(optional)</span></span>
-                        <input type="tel" inputmode="tel" id="waitlist-phone" name="phone" placeholder="+972 50 000 0000" aria-label="Phone number" autocomplete="tel">
-                    </label>
-                    <label class="field">
-                        <span class="field-label">LinkedIn <span class="opt">(optional)</span></span>
-                        <input type="text" id="waitlist-linkedin" name="linkedin" placeholder="linkedin.com/in/you" aria-label="LinkedIn profile" autocomplete="off">
-                    </label>
                     <button type="submit" id="waitlist-submit" class="btn-primary">Join the waitlist</button>
                 </form>
                 <p id="waitlist-message" class="waitlist-message" role="status" aria-live="polite"></p>
+                <p id="waitlist-counter" class="waitlist-counter" aria-live="polite"></p>
+
+                <a href="#about-yoodolon" class="scroll-hint">
+                    <span>What is Yoodolon?</span>
+                    <span class="scroll-hint-arrow" aria-hidden="true">&darr;</span>
+                </a>
             </section>
 
             <section id="about-yoodolon" class="yoodolon-info">

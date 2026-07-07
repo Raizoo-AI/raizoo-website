@@ -317,6 +317,61 @@ input::placeholder {
 .waitlist-message.success { color: #34d399; }
 .waitlist-message.error { color: #f87171; }
 
+/* Incentive badge: early-signup perk, shown above the form */
+.incentive-badge {
+    display: inline-block;
+    max-width: 380px;
+    margin: 0 auto 20px;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: rgba(99, 102, 241, 0.12);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 600;
+    line-height: 1.4;
+    animation: fadeInUp 0.8s ease-out 0.1s both;
+}
+
+/* Live signup counter */
+.waitlist-counter {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-tertiary);
+    min-height: 1.2em;
+}
+
+/* Scroll hint: nudges toward the info section without leaving the fold */
+.scroll-hint {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin-top: 20px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    font-weight: 600;
+    opacity: 0.85;
+    transition: opacity 0.2s ease, color 0.2s ease;
+}
+
+.scroll-hint:hover {
+    opacity: 1;
+    color: var(--accent);
+}
+
+.scroll-hint-arrow {
+    font-size: 1rem;
+    animation: bounce 1.8s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+}
+
 /* Link styled as a button (main-site CTA) */
 .btn-link {
     display: inline-block;

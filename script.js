@@ -55,6 +55,20 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
 const WAITLIST_ENDPOINT = 'https://wgmcc22seg.execute-api.us-east-1.amazonaws.com/';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Waitlist counter: shows a baseline of 100 plus real signups, fetched from
+// the same Lambda (GET instead of POST). Fails silently if unreachable.
+const counterEl = document.querySelector('#waitlist-counter');
+if (counterEl) {
+    fetch(WAITLIST_ENDPOINT)
+        .then((res) => res.json())
+        .then((data) => {
+            if (data?.ok && typeof data.count === 'number') {
+                counterEl.textContent = `${data.count} people have already joined`;
+            }
+        })
+        .catch(() => {});
+}
+
 const waitlistForm = document.querySelector('#waitlist-form');
 waitlistForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -63,8 +77,6 @@ waitlistForm?.addEventListener('submit', async (e) => {
     const submitBtn = document.querySelector('#waitlist-submit');
     const messageEl = document.querySelector('#waitlist-message');
     const email = emailInput?.value.trim() ?? '';
-    const phone = document.querySelector('#waitlist-phone')?.value.trim() ?? '';
-    const linkedin = document.querySelector('#waitlist-linkedin')?.value.trim() ?? '';
 
     const setMessage = (text, kind) => {
         if (!messageEl) return;
@@ -89,13 +101,19 @@ waitlistForm?.addEventListener('submit', async (e) => {
         const res = await fetch(WAITLIST_ENDPOINT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, phone, linkedin, source: 'waitlist-ibu-ai' }),
+            body: JSON.stringify({ email, source: 'waitlist-ibu-ai' }),
         });
         const data = await res.json().catch(() => ({}));
 
         if (res.ok && data.ok) {
             setMessage(data.message || "You're on the list!", 'success');
             waitlistForm.reset();
+            if (counterEl && !data.already) {
+                const current = parseInt(counterEl.textContent, 10);
+                if (!Number.isNaN(current)) {
+                    counterEl.textContent = `${current + 1} people have already joined`;
+                }
+            }
         } else if (data.error === 'invalid_email') {
             setMessage('Please enter a valid email address.', 'error');
         } else {
