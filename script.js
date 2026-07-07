@@ -50,7 +50,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
-// Waitlist signup — posts to an AWS Lambda (via API Gateway) that appends each
+// Waitlist signup: posts to an AWS Lambda (via API Gateway) that appends each
 // signup to waitlist.csv / waitlist.json in a private S3 bucket. No manual setup.
 const WAITLIST_ENDPOINT = 'https://wgmcc22seg.execute-api.us-east-1.amazonaws.com/';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

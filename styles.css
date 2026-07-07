@@ -242,7 +242,7 @@ input::placeholder {
     color: var(--text-tertiary);
 }
 
-/* Waitlist page hero — compact so the form + info fit on mobile */
+/* Waitlist page hero: compact so the form + info fit on mobile */
 .waitlist-hero {
     min-height: auto;
     padding: 24px 0 8px;
@@ -266,7 +266,7 @@ input::placeholder {
     font-size: 0.5em;
 }
 
-/* Waitlist form — stacked, thin inputs, mobile-first */
+/* Waitlist form: stacked, thin inputs, mobile-first */
 .waitlist-form {
     display: flex;
     flex-direction: column;
