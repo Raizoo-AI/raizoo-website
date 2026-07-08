@@ -389,6 +389,12 @@ input::placeholder {
 }
 
 .try-chat-intro {
+    margin-bottom: 10px !important;
+}
+
+.try-chat-disclaimer {
+    font-size: 0.8rem !important;
+    color: var(--text-tertiary) !important;
     margin-bottom: 28px !important;
 }
 
