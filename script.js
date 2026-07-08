@@ -128,3 +128,242 @@ waitlistForm?.addEventListener('submit', async (e) => {
         }
     }
 });
+
+// "Try Yoodolon" chat widget: one stateless message -> one reply, backed by a
+// standalone Lambda (device + IP + global rate-limited). No conversation
+// history is kept server-side, so the UI shows only the current exchange
+// rather than an accumulating thread that would misleadingly imply memory.
+const CHAT_ENDPOINT = 'https://wgmcc22seg.execute-api.us-east-1.amazonaws.com/chat';
+const DEVICE_ID_KEY = '_yoo_chat_did';
+
+function getOrCreateDeviceId() {
+    try {
+        let id = localStorage.getItem(DEVICE_ID_KEY);
+        if (!id) {
+            id = 'anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem(DEVICE_ID_KEY, id);
+        }
+        return id;
+    } catch {
+        // localStorage unavailable, or exists but throws on write (e.g. Safari
+        // private mode) -- fall back to an in-memory-only id for this session.
+        return 'anon-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+    }
+}
+
+const chatForm = document.querySelector('#chat-form');
+if (chatForm) {
+    const deviceId = getOrCreateDeviceId(); // computed once, cached for the page's lifetime
+    const chatThread = document.querySelector('#chat-thread');
+    const chatLoading = document.querySelector('#chat-loading');
+    const chatInput = document.querySelector('#chat-input');
+    const chatSubmit = document.querySelector('#chat-submit');
+    const chatError = document.querySelector('#chat-error');
+    const chatRemaining = document.querySelector('#chat-remaining');
+    const chatCapCta = document.querySelector('#chat-cap-cta');
+
+    const CHAT_ERROR_COPY = {
+        device_limit_reached: "You've used your 10 free messages with Yoodolon. Join the waitlist below to keep talking once we launch.",
+        ip_limit_reached: "This demo is getting a lot of visitors right now. Join the waitlist below and we'll let you know the moment Yoodolon's ready for you.",
+        invalid_input: 'Please enter a shorter message.',
+        no_reply: "Yoodolon didn't have a reply for that one — try rephrasing?",
+        service_unavailable: "Yoodolon's taking a moment. Try again in a bit.",
+        network_error: "Couldn't reach the server — check your connection and try again.",
+    };
+
+    const STATE_IDLE = 'idle';
+    const STATE_LOADING = 'loading';
+    const STATE_CAPPED = 'capped';
+    let widgetState = STATE_IDLE;
+
+    let lastSubmittedMessage = '';
+    let revertTimer = null;
+    let latestRequestSeq = 0;
+    let slowLoadingTimer = null;
+
+    const setError = (text) => {
+        if (!chatError) return;
+        chatError.textContent = text || '';
+        chatError.hidden = !text;
+    };
+
+    const setLoading = (isLoading) => {
+        if (!chatLoading) return;
+        chatLoading.hidden = !isLoading;
+        chatLoading.classList.remove('slow');
+        chatLoading.textContent = 'Yoodolon is typing…';
+        if (slowLoadingTimer) { clearTimeout(slowLoadingTimer); slowLoadingTimer = null; }
+        if (isLoading) {
+            slowLoadingTimer = setTimeout(() => {
+                chatLoading.classList.add('slow');
+                chatLoading.textContent = 'Still thinking… almost there.';
+            }, 8000);
+        }
+    };
+
+    const setRemaining = (n) => {
+        if (!chatRemaining) return;
+        if (typeof n !== 'number') {
+            chatRemaining.textContent = 'Up to 10 free messages';
+            return;
+        }
+        chatRemaining.textContent = n > 0
+            ? `${n} free message${n === 1 ? '' : 's'} left`
+            : "That's your last free message for now.";
+    };
+
+    const enterCappedState = (ctaVisible) => {
+        widgetState = STATE_CAPPED;
+        chatInput.disabled = true;
+        chatSubmit.disabled = true;
+        if (ctaVisible && chatCapCta) {
+            chatCapCta.hidden = false;
+            const ctaLink = chatCapCta.querySelector('a');
+            ctaLink?.focus();
+        }
+    };
+
+    function clearCopyRevert() {
+        if (revertTimer) { clearTimeout(revertTimer); revertTimer = null; }
+    }
+
+    function renderTurn(userMessage, botReply) {
+        clearCopyRevert();
+        chatThread.innerHTML = '';
+
+        const userBubble = document.createElement('div');
+        userBubble.className = 'chat-bubble chat-bubble-user';
+        userBubble.textContent = userMessage; // textContent only -- never innerHTML of visitor/model text
+        chatThread.appendChild(userBubble);
+
+        if (!botReply) return;
+
+        const botBubble = document.createElement('div');
+        botBubble.className = 'chat-bubble chat-bubble-bot';
+        const label = document.createElement('span');
+        label.className = 'chat-bubble-bot-label';
+        label.textContent = 'Yoodolon';
+        botBubble.appendChild(label);
+        const botText = document.createElement('span');
+        botText.textContent = botReply;
+        botBubble.appendChild(botText);
+        chatThread.appendChild(botBubble);
+
+        const copyRow = document.createElement('div');
+        copyRow.className = 'chat-copy-row';
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'chat-copy-btn';
+        copyBtn.textContent = 'Copy this message to try in ChatGPT';
+        copyRow.appendChild(copyBtn);
+        chatThread.appendChild(copyRow);
+
+        copyBtn.addEventListener('click', () => {
+            // Reads lastSubmittedMessage live, not a value captured at button-creation
+            // time -- this widget accepts up to 10 turns, and a stale closure would
+            // silently copy an earlier turn's message from turn 2 onward.
+            navigator.clipboard.writeText(lastSubmittedMessage)
+                .then(() => {
+                    clearCopyRevert();
+                    copyBtn.textContent = 'Copied!';
+                    revertTimer = setTimeout(() => {
+                        copyBtn.textContent = 'Copy this message to try in ChatGPT';
+                        revertTimer = null;
+                    }, 2000);
+                })
+                .catch(() => {
+                    copyRow.innerHTML = '';
+                    const fallback = document.createElement('textarea');
+                    fallback.className = 'chat-copy-fallback';
+                    fallback.readOnly = true;
+                    fallback.value = lastSubmittedMessage;
+                    fallback.rows = 2;
+                    copyRow.appendChild(fallback);
+                    fallback.focus();
+                    fallback.select();
+                });
+        });
+    }
+
+    function trySend() {
+        if (widgetState !== STATE_IDLE) return; // gates BOTH Enter and click paths
+        const message = chatInput.value.trim();
+        if (!message) return;
+        if (message.length > 500) {
+            setError(CHAT_ERROR_COPY.invalid_input);
+            return;
+        }
+        handleSend(message);
+    }
+
+    async function handleSend(message) {
+        widgetState = STATE_LOADING;
+        chatSubmit.disabled = true;
+        setError('');
+        setLoading(true);
+        lastSubmittedMessage = message;
+
+        const seq = ++latestRequestSeq;
+        const controller = new AbortController();
+        const clientTimeout = setTimeout(() => controller.abort(), 28000);
+
+        try {
+            const res = await fetch(CHAT_ENDPOINT, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, deviceId }),
+                signal: controller.signal,
+            });
+            clearTimeout(clientTimeout);
+            const data = await res.json().catch(() => ({}));
+
+            if (seq !== latestRequestSeq) return; // superseded by a newer request
+
+            if (data.ok) {
+                chatInput.value = '';
+                renderTurn(message, data.reply);
+                setRemaining(typeof data.remaining === 'number' ? data.remaining : undefined);
+                setLoading(false);
+                if (typeof data.remaining === 'number' && data.remaining <= 0) {
+                    enterCappedState(true);
+                } else {
+                    widgetState = STATE_IDLE;
+                    chatSubmit.disabled = false;
+                }
+                return;
+            }
+
+            setLoading(false);
+            renderTurn(message, null);
+            const copy = CHAT_ERROR_COPY[data.error] || CHAT_ERROR_COPY.service_unavailable;
+            setError(copy);
+
+            if (data.error === 'device_limit_reached' || data.error === 'ip_limit_reached') {
+                enterCappedState(true);
+            } else {
+                widgetState = STATE_IDLE;
+                chatSubmit.disabled = false;
+            }
+        } catch (err) {
+            clearTimeout(clientTimeout);
+            if (seq !== latestRequestSeq) return;
+            setLoading(false);
+            renderTurn(message, null);
+            setError(CHAT_ERROR_COPY.network_error);
+            widgetState = STATE_IDLE;
+            chatSubmit.disabled = false;
+        }
+    }
+
+    chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        trySend();
+    });
+
+    chatInput?.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            trySend();
+        }
+    });
+}

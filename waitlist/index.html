@@ -52,6 +52,28 @@
                 </a>
             </section>
 
+            <section id="try-yoodolon" class="try-chat">
+                <h2><span class="spark">&#10022;</span> Try Yoodolon</h2>
+                <p class="try-chat-intro">Send Yoodolon one message and see how it replies. Then try the exact same message in ChatGPT, and see the difference for yourself.</p>
+
+                <div id="chat-thread" class="chat-thread" aria-live="polite"></div>
+                <p id="chat-loading" class="chat-loading" aria-live="polite" hidden>Yoodolon is typing&hellip;</p>
+
+                <form id="chat-form" class="chat-form" novalidate>
+                    <label class="field">
+                        <span class="field-label sr-only">Your message</span>
+                        <textarea id="chat-input" name="message" placeholder="Ask Yoodolon anything&hellip;" maxlength="500" rows="2" aria-describedby="chat-error"></textarea>
+                    </label>
+                    <button type="submit" id="chat-submit" class="btn-primary">Send</button>
+                </form>
+                <p id="chat-error" class="chat-error" role="alert" aria-describedby="chat-error" hidden></p>
+                <p id="chat-remaining" class="chat-remaining" aria-live="polite">Up to 10 free messages</p>
+
+                <div id="chat-cap-cta" class="chat-cap-cta" hidden>
+                    <a href="#waitlist-form" class="btn-primary btn-link">Join the waitlist</a>
+                </div>
+            </section>
+
             <section id="about-yoodolon" class="yoodolon-info">
                 <p class="yoodolon-tagline">&ldquo;Information is everywhere. Inner truth is only here.&rdquo;</p>
                 <h2><span class="spark">✦</span> What is Yoodolon&trade;?</h2>
