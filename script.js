@@ -36,6 +36,87 @@
     });
 })();
 
+// Mixpanel tracking. Shared across all rzw pages (main landing + waitlist).
+// Every event carries `site` so both pages stay separable within one project.
+(function () {
+    if (typeof mixpanel === 'undefined') return;
+
+    const SITE = location.pathname.includes('/waitlist') ? 'waitlist' : 'landing';
+    mixpanel.register({ site: SITE });
+
+    const RETURN_KEY = '_yoo_returning';
+    let isReturning = false;
+    try {
+        isReturning = localStorage.getItem(RETURN_KEY) === '1';
+        localStorage.setItem(RETURN_KEY, '1');
+    } catch { /* private-mode storage unavailable -- treat as first visit */ }
+
+    mixpanel.track('Page Viewed', { path: location.pathname, is_returning_visitor: isReturning });
+
+    // Scroll depth: fire each milestone once per page load.
+    const SCROLL_MILESTONES = [25, 50, 75, 100];
+    const firedMilestones = new Set();
+    let scrollTicking = false;
+    function checkScrollDepth() {
+        const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+        if (docHeight <= 0) return;
+        const pct = Math.min(100, Math.round((window.scrollY / docHeight) * 100));
+        for (const milestone of SCROLL_MILESTONES) {
+            if (pct >= milestone && !firedMilestones.has(milestone)) {
+                firedMilestones.add(milestone);
+                mixpanel.track('Scroll Depth', { depth_pct: milestone });
+            }
+        }
+    }
+    window.addEventListener('scroll', () => {
+        if (scrollTicking) return;
+        scrollTicking = true;
+        requestAnimationFrame(() => { checkScrollDepth(); scrollTicking = false; });
+    });
+
+    // Dwell time: fired once, on the first signal that the visitor is leaving/hiding
+    // the tab. visibilitychange fires reliably on mobile (where pagehide/unload are
+    // unreliable); pagehide covers desktop back/forward-cache navigation.
+    const pageLoadTime = Date.now();
+    let dwellReported = false;
+    function reportDwellTime() {
+        if (dwellReported) return;
+        dwellReported = true;
+        mixpanel.track('Time On Page', { duration_seconds: Math.round((Date.now() - pageLoadTime) / 1000) });
+    }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') reportDwellTime();
+    });
+    window.addEventListener('pagehide', reportDwellTime);
+
+    // Theme toggle
+    document.getElementById('theme-toggle')?.addEventListener('click', () => {
+        setTimeout(() => {
+            mixpanel.track('Theme Toggled', { new_theme: document.documentElement.getAttribute('data-theme') || 'dark' });
+        }, 0); // after the existing handler has applied the new theme
+    });
+
+    // Scroll hint
+    document.querySelector('.scroll-hint')?.addEventListener('click', () => {
+        mixpanel.track('Scroll Hint Clicked');
+    });
+
+    // Generic CTA clicks, tagged via data-cta on the element
+    document.querySelectorAll('[data-cta]').forEach((el) => {
+        el.addEventListener('click', () => mixpanel.track('CTA Clicked', { cta_name: el.dataset.cta }));
+    });
+
+    // Outbound link clicks (any link leaving ibu-ai.com/raizoo.ai entirely)
+    document.querySelectorAll('a[href]').forEach((a) => {
+        const href = a.getAttribute('href');
+        if (!href || href.startsWith('#')) return;
+        let url;
+        try { url = new URL(href, location.href); } catch { return; }
+        if (url.hostname === location.hostname) return;
+        a.addEventListener('click', () => mixpanel.track('Outbound Link Clicked', { destination: url.href }));
+    });
+})();
+
 // Smooth scrolling for navigation
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
@@ -87,6 +168,7 @@ waitlistForm?.addEventListener('submit', async (e) => {
     if (!EMAIL_RE.test(email)) {
         setMessage('Please enter a valid email address.', 'error');
         emailInput?.focus();
+        mixpanel?.track('Waitlist Signup Failed', { reason: 'invalid_email' });
         return;
     }
 
@@ -96,6 +178,7 @@ waitlistForm?.addEventListener('submit', async (e) => {
         submitBtn.textContent = 'Joining…';
     }
     setMessage('', '');
+    mixpanel?.track('Waitlist Signup Submitted');
 
     try {
         const res = await fetch(WAITLIST_ENDPOINT, {
@@ -108,6 +191,7 @@ waitlistForm?.addEventListener('submit', async (e) => {
         if (res.ok && data.ok) {
             setMessage(data.message || "You're on the list!", 'success');
             waitlistForm.reset();
+            mixpanel?.track('Waitlist Signup Succeeded', { already_registered: !!data.already });
             if (counterEl && !data.already) {
                 const current = parseInt(counterEl.textContent, 10);
                 if (!Number.isNaN(current)) {
@@ -116,11 +200,14 @@ waitlistForm?.addEventListener('submit', async (e) => {
             }
         } else if (data.error === 'invalid_email') {
             setMessage('Please enter a valid email address.', 'error');
+            mixpanel?.track('Waitlist Signup Failed', { reason: 'invalid_email' });
         } else {
             setMessage('Something went wrong. Please try again.', 'error');
+            mixpanel?.track('Waitlist Signup Failed', { reason: data.error || 'unknown' });
         }
     } catch {
         setMessage('Network error. Please check your connection and try again.', 'error');
+        mixpanel?.track('Waitlist Signup Failed', { reason: 'network_error' });
     } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
@@ -262,6 +349,7 @@ if (chatForm) {
             // Reads lastSubmittedMessage live, not a value captured at button-creation
             // time -- this widget accepts up to 10 turns, and a stale closure would
             // silently copy an earlier turn's message from turn 2 onward.
+            mixpanel?.track('Chat Copy Clicked');
             navigator.clipboard.writeText(lastSubmittedMessage)
                 .then(() => {
                     clearCopyRevert();
@@ -302,6 +390,7 @@ if (chatForm) {
         setError('');
         setLoading(true);
         lastSubmittedMessage = message;
+        mixpanel?.track('Chat Message Sent', { message_length: message.length });
 
         const seq = ++latestRequestSeq;
         const controller = new AbortController();
@@ -324,7 +413,9 @@ if (chatForm) {
                 renderTurn(message, data.reply);
                 setRemaining(typeof data.remaining === 'number' ? data.remaining : undefined);
                 setLoading(false);
+                mixpanel?.track('Chat Reply Received', { remaining_count: data.remaining });
                 if (typeof data.remaining === 'number' && data.remaining <= 0) {
+                    mixpanel?.track('Chat Cap Reached');
                     enterCappedState(true);
                 } else {
                     widgetState = STATE_IDLE;
@@ -337,6 +428,7 @@ if (chatForm) {
             renderTurn(message, null);
             const copy = CHAT_ERROR_COPY[data.error] || CHAT_ERROR_COPY.service_unavailable;
             setError(copy);
+            mixpanel?.track('Chat Error Shown', { error_code: data.error || 'unknown' });
 
             if (data.error === 'device_limit_reached' || data.error === 'ip_limit_reached') {
                 enterCappedState(true);
@@ -350,6 +442,7 @@ if (chatForm) {
             setLoading(false);
             renderTurn(message, null);
             setError(CHAT_ERROR_COPY.network_error);
+            mixpanel?.track('Chat Error Shown', { error_code: 'network_error' });
             widgetState = STATE_IDLE;
             chatSubmit.disabled = false;
         }
