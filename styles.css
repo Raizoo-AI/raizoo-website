@@ -556,10 +556,13 @@ input::placeholder {
 }
 
 /* Yoodolon info section */
+/* This is the page's lead section -- trim the generic 120px section padding
+   so the hook isn't pushed below the fold by dead space. */
 .yoodolon-info {
     max-width: 640px;
     margin: 0 auto;
     text-align: left;
+    padding-top: 32px;
 }
 
 .yoodolon-tagline {
