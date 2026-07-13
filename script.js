@@ -101,20 +101,96 @@
         mixpanel.track('Scroll Hint Clicked');
     });
 
-    // Generic CTA clicks, tagged via data-cta on the element
+    // Fires one or more tracking calls, then navigates -- but only after every
+    // call has either completed or a safety-net timeout expires, whichever is
+    // first. A bare `mixpanel.track()` followed by an immediate same-tick
+    // navigation gets its in-flight request cancelled by the browser before it
+    // reaches Mixpanel; this is why CTA/outbound clicks on this site never
+    // showed up despite being clicked (verified: those events had zero
+    // occurrences in Mixpanel although real signups on the destination page
+    // proved the clicks were happening).
+    function trackThenNavigate(href, tracks) {
+        let navigated = false;
+        const nav = () => {
+            if (navigated) return;
+            navigated = true;
+            window.location.href = href;
+        };
+        let pending = tracks.length;
+        const done = () => { if (--pending <= 0) nav(); };
+        tracks.forEach(([name, props]) => mixpanel.track(name, props, done));
+        setTimeout(nav, 300); // safety net if a request is blocked (ad blockers etc.) and its callback never fires
+    }
+
+    // Generic CTA clicks, tagged via data-cta on the element. Also fires
+    // "Outbound Link Clicked" when the CTA leaves this hostname, since that's
+    // by far the most common case (e.g. the landing page's "Join the
+    // waitlist" button) and avoids double-handling the same click elsewhere.
     document.querySelectorAll('[data-cta]').forEach((el) => {
-        el.addEventListener('click', () => mixpanel.track('CTA Clicked', { cta_name: el.dataset.cta }));
+        el.addEventListener('click', (e) => {
+            const cta_name = el.dataset.cta;
+            const href = el.getAttribute('href');
+            let url = null;
+            if (href) { try { url = new URL(href, location.href); } catch { /* not a navigable URL */ } }
+
+            const isOutbound = url && /^https?:$/.test(url.protocol) && url.hostname !== location.hostname;
+            if (!isOutbound) {
+                mixpanel.track('CTA Clicked', { cta_name });
+                return; // no navigation to protect (in-page anchor, or none)
+            }
+
+            e.preventDefault();
+            trackThenNavigate(url.href, [
+                ['CTA Clicked', { cta_name }],
+                ['Outbound Link Clicked', { destination: url.href }],
+            ]);
+        });
     });
 
-    // Outbound link clicks (any link leaving ibu-ai.com/raizoo.ai entirely)
-    document.querySelectorAll('a[href]').forEach((a) => {
+    // Outbound link clicks for any other link leaving ibu-ai.com/raizoo.ai
+    // entirely (excludes [data-cta] elements -- handled above, together with
+    // navigation-safe tracking).
+    document.querySelectorAll('a[href]:not([data-cta])').forEach((a) => {
         const href = a.getAttribute('href');
         if (!href || href.startsWith('#')) return;
         let url;
         try { url = new URL(href, location.href); } catch { return; }
-        if (url.hostname === location.hostname) return;
-        a.addEventListener('click', () => mixpanel.track('Outbound Link Clicked', { destination: url.href }));
+        if (!/^https?:$/.test(url.protocol) || url.hostname === location.hostname) return;
+        a.addEventListener('click', (e) => {
+            e.preventDefault();
+            trackThenNavigate(url.href, [['Outbound Link Clicked', { destination: url.href }]]);
+        });
     });
+
+    // Button/form visibility (impression), fired once per element per page load.
+    // Lets us tell "saw the CTA but didn't click" apart from "never scrolled far
+    // enough to see it" -- neither was previously observable.
+    const visibilityTargets = document.querySelectorAll('[data-cta], #waitlist-submit');
+    if (visibilityTargets.length && 'IntersectionObserver' in window) {
+        const seen = new WeakSet();
+        const io = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting || seen.has(entry.target)) return;
+                seen.add(entry.target);
+                io.unobserve(entry.target);
+                const el = entry.target;
+                const button_name = el.dataset.cta || el.id;
+                mixpanel.track('Button Visible', { button_name });
+            });
+        }, { threshold: 0.5 });
+        visibilityTargets.forEach((el) => io.observe(el));
+    }
+
+    // "Started typing" on the waitlist email field, fired once per page load.
+    const waitlistEmailInput = document.querySelector('#waitlist-email');
+    if (waitlistEmailInput) {
+        let fired = false;
+        waitlistEmailInput.addEventListener('input', () => {
+            if (fired) return;
+            fired = true;
+            mixpanel.track('Waitlist Email Started');
+        }, { once: true });
+    }
 })();
 
 // Smooth scrolling for navigation
