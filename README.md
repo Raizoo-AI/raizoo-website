@@ -20,5 +20,5 @@ https://www.raizoo.ai
 ## Deployment
 ```bash
 # Deploy to S3
-aws s3 sync . s3://www.raizoo.ai --exclude "*.git*" --exclude "*.md"
+aws s3 sync . s3://www.raizoo.ai --exclude "*.git*" --exclude "*.md" --exclude ".omc/*"
 ```
